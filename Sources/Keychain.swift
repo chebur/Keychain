@@ -13,7 +13,7 @@ public final class Keychain {
     
     enum Error: LocalizedError {
         
-        case aclCreationFailed(error: Swift.Error?)
+        case accessControlCreationFailed(error: Swift.Error?)
         case itemCopyFailed(status: OSStatus)
         case itemAddFailed(status: OSStatus)
         case itemUpdateFailed(status: OSStatus)
@@ -21,11 +21,11 @@ public final class Keychain {
         
         var errorDescription: String? {
             switch self {
-            case .aclCreationFailed(let error):
+            case .accessControlCreationFailed(let error):
                 if let error = error {
-                    return "Can't create acl object \(error)"
+                    return "Can't create access control object \(error)"
                 } else {
-                    return "Can't create acl object"
+                    return "Can't create access control object"
                 }
             case .itemCopyFailed(let status):
                 return localizedStatusDescription(status)
@@ -170,7 +170,7 @@ public final class Keychain {
                 return accessControl
             } else {
                 let e = error?.takeRetainedValue() as Swift.Error?
-                throw Error.aclCreationFailed(error: e)
+                throw Error.accessControlCreationFailed(error: e)
             }
         }
         
