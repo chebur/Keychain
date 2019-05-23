@@ -58,7 +58,7 @@ class KeychainTests: XCTestCase {
         }
     }
     
-    func testDataExistanceTesting() throws {
+    func testDataExistenceTesting() throws {
         let keychain = Keychain(service: UUID().uuidString)
         
         try XCTContext.runActivity(named: "Should return true for existing data") { _ in
