@@ -2,6 +2,7 @@
 Keychain helper utility class
 
 ## Usage
+See [KeychainTests.swift](Sources/KeychainTests.swift) for usage examples.
 
 ```swift
 func testDataSetting() throws {
