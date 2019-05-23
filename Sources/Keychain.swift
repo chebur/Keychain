@@ -14,13 +14,9 @@ public final class Keychain {
     enum Error: LocalizedError {
         
         case aclCreationFailed(error: Swift.Error?)
-        
         case itemCopyFailed(status: OSStatus)
-        
         case itemAddFailed(status: OSStatus)
-        
         case itemUpdateFailed(status: OSStatus)
-        
         case itemDeleteFailed(status: OSStatus)
         
         var errorDescription: String? {
@@ -43,24 +39,23 @@ public final class Keychain {
         }
         
         private func localizedStatusDescription(_ status: OSStatus) -> String? {
-            switch status {
-            case errSecSuccess:
-                return "No error."
-            case errSecDuplicateItem:
-                return "The specified item already exists in the keychain."
-            case errSecItemNotFound :
-                return "The specified item could not be found in the keychain."
-            case errSecAuthFailed:
-                return "The user name or passphrase you entered is not correct."
-            case errSecUserCanceled:
-                return "User canceled the operation"
-            default:
+            if #available(iOS 11.3, *) {
+                return SecCopyErrorMessageString(status, nil) as String?
+            } else {
                 return nil
             }
         }
         
     }
     
+    /// Access control object
+    ///
+    /// Access control object should be used as a value for kSecAttrAccessControl attribute in SecItemAdd,
+    /// SecItemUpdate or SecKeyGeneratePair functions.  Accessing keychain items or performing operations on keys which are
+    /// protected by access control objects can block the execution because of UI which can appear to satisfy the access control
+    /// conditions, therefore it is recommended to either move those potentially blocking operations out of the main
+    /// application thread or use combination of kSecUseAuthenticationContext and kSecUseAuthenticationUI attributes to control
+    /// where the UI interaction can appear.
     public struct AccessControl {
         
         /// Predefined item attribute constants used to get or set values in a dictionary. The kSecAttrAccessible constant is the key and its value is one of the constants defined here. When asking SecItemCopyMatching to return the item's data, the error errSecInteractionNotAllowed will be returned if the item's data is not available until a device unlock occurs.
@@ -162,7 +157,6 @@ public final class Keychain {
         }
         
         public var protection: Accessibility
-        
         public var flags: SecAccessControlCreateFlags?
         
         public init(protection: Accessibility, flags: SecAccessControlCreateFlags? = nil) {
@@ -172,12 +166,12 @@ public final class Keychain {
         
         public func create() throws -> SecAccessControl {
             var error: Unmanaged<CFError>?
-            let acl = SecAccessControlCreateWithFlags(kCFAllocatorDefault, protection.rawValue, flags ?? [], &error)
-            if acl == nil {
+            if let accessControl = SecAccessControlCreateWithFlags(kCFAllocatorDefault, protection.rawValue, flags ?? [], &error) {
+                return accessControl
+            } else {
                 let e = error?.takeRetainedValue() as Swift.Error?
                 throw Error.aclCreationFailed(error: e)
             }
-            return acl!
         }
         
     }
@@ -197,19 +191,21 @@ public final class Keychain {
         /// of class kSecClassInternetPassword are supported.
         public enum ItemClass: RawRepresentable {
             
-            /// Specifies Internet password items.
+            /// The value that indicates an Internet password item.
             case internetPassword
             
-            /// Specifies generic password items.
+            /// The value that indicates a generic password item.
             case genericPassword
             
-            /// Specifies certificate items.
+            /// The value that indicates a certificate item.
             case certificate
             
-            /// Specifies key items.
+            /// The value that indicates a cryptographic key item.
             case key
             
             /// Specifies identity items.
+            ///
+            /// An identity is a certificate paired with its associated private key. Because an identity is the combination of a private key and a certificate, this class shares attributes of both kSecClassKey and kSecClassCertificate.
             case identity
             
             public init?(rawValue: CFString) {
@@ -297,9 +293,7 @@ public final class Keychain {
         public enum MatchLimit: RawRepresentable {
             
             case one
-            
             case all
-            
             case count(NSNumber)
             
             public init?(rawValue: Any) {
@@ -333,8 +327,8 @@ public final class Keychain {
         /// Returns a value that indicates an internet password item.
         ///
         /// - Parameters:
-        ///     - account: A key whose value is a string indicating the item's account name.
-        public static func internetPasswordItem(forAccount account: String) -> Attributes {
+        ///     - account: Item's account name.
+        public static func internetPasswordItem(account: String) -> Attributes {
             return Attributes {
                 $0.itemClass = .internetPassword
                 $0.account = account
@@ -344,13 +338,23 @@ public final class Keychain {
         /// Returns a value that indicates a generic password item.
         ///
         /// - Parameters:
-        ///     - account: A key whose value is a string indicating the item's account name.
-        ///     - generic: A key whose value indicates the item's user-defined attributes.
-        public static func genericPasswordItem(forAccount account: String, generic: Data?) -> Attributes {
+        ///     - account: Item's account name.
+        ///     - generic: Item's user-defined attributes.
+        public static func genericPasswordItem(account: String, generic: Data? = nil) -> Attributes {
             return Attributes {
                 $0.itemClass = .genericPassword
                 $0.account = account
                 $0.generic = generic
+            }
+        }
+        
+        /// A key whose value is a string indicating the access group an item is in.
+        public var accessGroup: String? {
+            get {
+                return storage[kSecAttrAccessGroup as String] as? String
+            }
+            set {
+                storage[kSecAttrAccessGroup as String] = newValue
             }
         }
         
@@ -441,7 +445,6 @@ public final class Keychain {
                 guard let value = storage[kSecAttrAccessControl as String] else {
                     return nil
                 }
-                
                 return (value as! SecAccessControl) // swiftlint:disable:this force_cast
             }
             set {
@@ -512,23 +515,24 @@ public final class Keychain {
         
     }
     
-    static let `default` = Keychain(service: Bundle.main.bundleIdentifier ?? String(describing: Keychain.self))
-    
     public let service: String
+    public let accessGroup: String?
     
-    public init(service: String) {
+    public init(service: String, accessGroup: String? = nil) {
         self.service = service
+        self.accessGroup = accessGroup
     }
     
-    public func data(attributes: Attributes) throws -> Data {
-        var query = attributes
-        query.service = service
-        query.returnData = true
-        query.returnAttributes = true
-        query.matchLimit = .one
+    public func data(query: Attributes) throws -> Data {
+        var mutableQuery = query
+        mutableQuery.service = service
+        mutableQuery.accessGroup = accessGroup
+        mutableQuery.returnData = true
+        mutableQuery.returnAttributes = true
+        mutableQuery.matchLimit = .one
         
         var result: CFTypeRef?
-        let status = SecItemCopyMatching(query.storage as CFDictionary, &result)
+        let status = SecItemCopyMatching(mutableQuery.storage as CFDictionary, &result)
         if let result = result as? [String: Any] {
             let attributes = Attributes(storage: result)
             if let data = attributes.valueData {
@@ -538,70 +542,69 @@ public final class Keychain {
         throw Error.itemCopyFailed(status: status)
     }
     
-    public func setData(_ data: Data, attributes: Attributes, acl: AccessControl, rewriteOnInteractionNotAllowed: Bool = true) throws {
+    public func setData(_ data: Data, query: Attributes, accessControl: AccessControl? = nil) throws {
+        var mutableQuery = query
+        mutableQuery.useAuthenticationUi = .fail
+        
         do {
-            var query = attributes
-            query.useAuthenticationUi = .fail
-            let _: Data = try self.data(attributes: query)
-            try updateData(data, attributes: attributes, acl: acl)
+            _ = try self.data(query: mutableQuery)
+            try updateData(data, query: query, accessControl: accessControl)
         } catch Error.itemCopyFailed(let status) where status == errSecInteractionNotAllowed {
-            if rewriteOnInteractionNotAllowed {
-                // rewrite
-                try deleteData(attributes: attributes)
-                try addData(data, attributes: attributes, acl: acl)
-            } else {
-                // update
-                try updateData(data, attributes: attributes, acl: acl)
-            }
+            // rewrite
+            try deleteData(query: query)
+            try addData(data, query: query, accessControl: accessControl)
         } catch Error.itemCopyFailed(let status) where status == errSecItemNotFound {
             // add
-            try addData(data, attributes: attributes, acl: acl)
+            try addData(data, query: query, accessControl: accessControl)
         }
     }
     
-    private func addData(_ data: Data, attributes: Attributes, acl: AccessControl) throws {
-        var query = attributes
-        query.service = service
-        query.valueData = data
-        query.accessControl = try acl.create()
+    private func addData(_ data: Data, query: Attributes, accessControl: AccessControl? = nil) throws {
+        var mutableQuery = query
+        mutableQuery.service = service
+        mutableQuery.accessGroup = accessGroup
+        mutableQuery.valueData = data
+        mutableQuery.accessControl = try accessControl?.create()
         
-        let status = SecItemAdd(query.storage as CFDictionary, nil)
+        let status = SecItemAdd(mutableQuery.storage as CFDictionary, nil)
         if status != errSecSuccess {
             throw Error.itemAddFailed(status: status)
         }
     }
     
-    private func updateData(_ data: Data, attributes: Attributes, acl: AccessControl) throws {
-        var query = attributes
-        query.service = service
+    private func updateData(_ data: Data, query: Attributes, accessControl: AccessControl? = nil) throws {
+        var mutableQuery = query
+        mutableQuery.service = service
+        mutableQuery.accessGroup = accessGroup
         
         var update = Attributes()
         update.valueData = data
-        update.accessControl = try acl.create()
+        update.accessControl = try accessControl?.create()
         
-        let status = SecItemUpdate(query.storage as CFDictionary, update.storage as CFDictionary)
+        let status = SecItemUpdate(mutableQuery.storage as CFDictionary, update.storage as CFDictionary)
         if status != errSecSuccess {
             throw Error.itemUpdateFailed(status: status)
         }
     }
     
-    public func deleteData(attributes: Attributes) throws {
-        var query = attributes
-        query.service = service
+    public func deleteData(query: Attributes) throws {
+        var mutableQuery = query
+        mutableQuery.service = service
+        mutableQuery.accessGroup = accessGroup
         
-        let status = SecItemDelete(query.storage as CFDictionary)
+        let status = SecItemDelete(mutableQuery.storage as CFDictionary)
         if status != errSecSuccess && status != errSecItemNotFound {
             throw Error.itemDeleteFailed(status: status)
         }
     }
     
     /// Disables authentication UI.
-    public func isDataExists(attributes: Attributes) throws -> Bool {
-        var query = attributes
-        query.useAuthenticationUi = .fail
+    public func hasData(query: Attributes) throws -> Bool {
+        var mutableQuery = query
+        mutableQuery.useAuthenticationUi = .fail
         
         do {
-            let _: Data = try self.data(attributes: query)
+            _ = try self.data(query: mutableQuery)
         } catch Error.itemCopyFailed(let status) where status == errSecItemNotFound {
             return false
         } catch Error.itemCopyFailed(let status) where status == errSecInteractionNotAllowed {
