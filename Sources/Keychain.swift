@@ -9,7 +9,7 @@
 import Foundation
 import Security
 
-final class Keychain {
+public final class Keychain {
     
     enum Error: LocalizedError {
         
@@ -45,17 +45,15 @@ final class Keychain {
         private func localizedStatusDescription(_ status: OSStatus) -> String? {
             switch status {
             case errSecSuccess:
-                return "No error"
+                return "No error."
             case errSecDuplicateItem:
-                return "The specified item already exists in the keychain"
+                return "The specified item already exists in the keychain."
             case errSecItemNotFound :
-                return "The specified item could not be found in the keychain"
+                return "The specified item could not be found in the keychain."
             case errSecAuthFailed:
-                return "The user name or passphrase you entered is not correct"
+                return "The user name or passphrase you entered is not correct."
             case errSecUserCanceled:
                 return "User canceled the operation"
-            case errSecMissingEntitlement:
-                return "A required entitlement isn't present"
             default:
                 return nil
             }
@@ -63,10 +61,10 @@ final class Keychain {
         
     }
     
-    struct AccessControl {
+    public struct AccessControl {
         
         /// Predefined item attribute constants used to get or set values in a dictionary. The kSecAttrAccessible constant is the key and its value is one of the constants defined here. When asking SecItemCopyMatching to return the item's data, the error errSecInteractionNotAllowed will be returned if the item's data is not available until a device unlock occurs.
-        enum Accessibility: RawRepresentable {
+        public enum Accessibility: RawRepresentable {
             
             /// Item data can only be accessed
             /// while the device is unlocked. This is recommended for items that only
@@ -121,7 +119,7 @@ final class Keychain {
             /// restored to a new device, these items will be missing.
             case alwaysThisDeviceOnly
             
-            init?(rawValue: CFString) {
+            public init?(rawValue: CFString) {
                 switch rawValue {
                 case let value where value == kSecAttrAccessibleWhenUnlocked:
                     self = .whenUnlocked
@@ -142,7 +140,7 @@ final class Keychain {
                 }
             }
             
-            var rawValue: CFString {
+            public var rawValue: CFString {
                 switch self {
                 case .whenUnlocked:
                     return kSecAttrAccessibleWhenUnlocked
@@ -163,16 +161,16 @@ final class Keychain {
             
         }
         
-        var protection: Accessibility
+        public var protection: Accessibility
         
-        var flags: SecAccessControlCreateFlags?
+        public var flags: SecAccessControlCreateFlags?
         
-        init(protection: Accessibility, flags: SecAccessControlCreateFlags? = nil) {
+        public init(protection: Accessibility, flags: SecAccessControlCreateFlags? = nil) {
             self.protection = protection
             self.flags = flags
         }
         
-        func create() throws -> SecAccessControl {
+        public func create() throws -> SecAccessControl {
             var error: Unmanaged<CFError>?
             let acl = SecAccessControlCreateWithFlags(kCFAllocatorDefault, protection.rawValue, flags ?? [], &error)
             if acl == nil {
@@ -189,7 +187,7 @@ final class Keychain {
     /// Predefined item attribute keys used to get or set values in a
     /// dictionary. Not all attributes apply to each item class. The table
     /// below lists the currently defined attributes for each item class:
-    struct Attributes {
+    public struct Attributes {
         
         /// Class Value Constants
         ///
@@ -197,7 +195,7 @@ final class Keychain {
         /// a dictionary. The kSecClass constant is the key and its value is one
         /// of the constants defined here. Note: on Mac OS X 10.6, only items
         /// of class kSecClassInternetPassword are supported.
-        enum ItemClass: RawRepresentable {
+        public enum ItemClass: RawRepresentable {
             
             /// Specifies Internet password items.
             case internetPassword
@@ -214,7 +212,7 @@ final class Keychain {
             /// Specifies identity items.
             case identity
             
-            init?(rawValue: CFString) {
+            public init?(rawValue: CFString) {
                 switch rawValue {
                 case let value where value == kSecClassInternetPassword:
                     self = .internetPassword
@@ -231,7 +229,7 @@ final class Keychain {
                 }
             }
             
-            var rawValue: CFString {
+            public var rawValue: CFString {
                 switch self {
                 case .internetPassword:
                     return kSecClassInternetPassword
@@ -255,7 +253,7 @@ final class Keychain {
         /// value is one of the constants defined here.
         /// If the key kSecUseAuthenticationUI not provided then kSecUseAuthenticationUIAllow
         /// is used as default.
-        enum UIAuthentication: RawRepresentable {
+        public enum UIAuthentication: RawRepresentable {
             
             /// Specifies that authenticate UI can appear.
             case allow
@@ -270,7 +268,7 @@ final class Keychain {
             /// only with SecItemCopyMatching.
             case skip
             
-            init?(rawValue: CFString) {
+            public init?(rawValue: CFString) {
                 switch rawValue {
                 case let value where value == kSecUseAuthenticationUIAllow:
                     self = .allow
@@ -283,7 +281,7 @@ final class Keychain {
                 }
             }
             
-            var rawValue: CFString {
+            public var rawValue: CFString {
                 switch self {
                 case .allow:
                     return kSecUseAuthenticationUIAllow
@@ -296,7 +294,7 @@ final class Keychain {
             
         }
         
-        enum MatchLimit: RawRepresentable {
+        public enum MatchLimit: RawRepresentable {
             
             case one
             
@@ -304,7 +302,7 @@ final class Keychain {
             
             case count(NSNumber)
             
-            init?(rawValue: Any) {
+            public init?(rawValue: Any) {
                 switch rawValue {
                 case let value as String where value == kSecMatchLimitOne as String:
                     self = .one
@@ -317,7 +315,7 @@ final class Keychain {
                 }
             }
             
-            var rawValue: Any {
+            public var rawValue: Any {
                 switch self {
                 case .one:
                     return kSecMatchLimitOne
@@ -336,7 +334,7 @@ final class Keychain {
         ///
         /// - Parameters:
         ///     - account: A key whose value is a string indicating the item's account name.
-        static func internetPasswordItem(forAccount account: String) -> Attributes {
+        public static func internetPasswordItem(forAccount account: String) -> Attributes {
             return Attributes {
                 $0.itemClass = .internetPassword
                 $0.account = account
@@ -348,7 +346,7 @@ final class Keychain {
         /// - Parameters:
         ///     - account: A key whose value is a string indicating the item's account name.
         ///     - generic: A key whose value indicates the item's user-defined attributes.
-        static func genericPasswordItem(forAccount account: String, generic: Data?) -> Attributes {
+        public static func genericPasswordItem(forAccount account: String, generic: Data?) -> Attributes {
             return Attributes {
                 $0.itemClass = .genericPassword
                 $0.account = account
@@ -357,7 +355,7 @@ final class Keychain {
         }
         
         /// Dictionary key whose value is the item's class code.
-        var itemClass: ItemClass? {
+        public var itemClass: ItemClass? {
             get {
                 guard let value = storage[kSecClass as String] as? String else {
                     return nil
@@ -372,7 +370,7 @@ final class Keychain {
         /// Service attribute key.
         ///
         /// The corresponding value is a string of type CFStringRef that represents the service associated with this item. Items of class kSecClassGenericPassword have this attribute.
-        var service: String? {
+        public var service: String? {
             get {
                 return storage[kSecAttrService as String] as? String
             }
@@ -384,7 +382,7 @@ final class Keychain {
         /// Account attribute key.
         ///
         /// The corresponding value is of type CFStringRef and contains an account name. Items of class kSecClassGenericPassword and kSecClassInternetPassword have this attribute.
-        var account: String? {
+        public var account: String? {
             get {
                 return storage[kSecAttrAccount as String] as? String
             }
@@ -392,11 +390,11 @@ final class Keychain {
                 storage[kSecAttrAccount as String] = newValue
             }
         }
-
+        
         /// A key whose value indicates the item's user-defined attributes.
         ///
         /// The corresponding value is of type CFData and contains a user-defined attribute. Items of class kSecClassGenericPassword have this attribute.
-        var generic: Data? {
+        public var generic: Data? {
             get {
                 return storage[kSecAttrGeneric as String] as? Data
             }
@@ -408,7 +406,7 @@ final class Keychain {
         /// Data attribute key. A persistent reference to a credential can be stored on disk for later use or passed to other processes.
         ///
         /// The corresponding value is of type CFDataRef.  For keys and password items, the data is secret (encrypted) and may require the user to enter a password for access.
-        var valueData: Data? {
+        public var valueData: Data? {
             get {
                 return storage[kSecValueData as String] as? Data
             }
@@ -420,7 +418,7 @@ final class Keychain {
         /// UI authentication key.
         ///
         /// The corresponding value is of type CFStringRef and contains one of the values listed in UI Authentication Values. The value specifies whether or not the user may be prompted for authentication, if needed. A default value of kSecUseAuthenticationUIAllow is assumed when this key is not present.
-        var useAuthenticationUi: UIAuthentication? {
+        public var useAuthenticationUi: UIAuthentication? {
             get {
                 guard let value = storage[kSecUseAuthenticationUI as String] as? String else {
                     return nil
@@ -438,7 +436,7 @@ final class Keychain {
         /// The corresponding value is a SecAccessControlRef object, created with the SecAccessControlCreateWithFlags function, containing access control conditions for the item.
         /// - Important:
         ///   This attribute is mutually exclusive with the kSecAttrAccess attribute.
-        var accessControl: SecAccessControl? {
+        public var accessControl: SecAccessControl? {
             get {
                 guard let value = storage[kSecAttrAccessControl as String] else {
                     return nil
@@ -454,7 +452,7 @@ final class Keychain {
         /// Operation prompt key.
         ///
         /// The corresponding value is of type CFStringRef and represents a string describing the operation for which the app is attempting to authenticate. When performing user authentication, the system includes the string in the user prompt. The app is responsible for text localization.
-        var useOperationPrompt: String? {
+        public var useOperationPrompt: String? {
             get {
                 return storage[kSecUseOperationPrompt as String] as? String
             }
@@ -466,7 +464,7 @@ final class Keychain {
         /// Return data attribute key.
         ///
         /// The corresponding value is of type CFBooleanRef. A value of kCFBooleanTrue indicates that the data of an item should be returned in the form of a CFDataRef. For keys and password items, data is secret (encrypted) and may require the user to enter a password for access
-        var returnData: Bool? {
+        public var returnData: Bool? {
             get {
                 return storage[kSecReturnData as String] as? Bool
             }
@@ -478,7 +476,7 @@ final class Keychain {
         /// Return attributes attribute key.
         ///
         /// The corresponding value is of type CFBooleanRef. A value of kCFBooleanTrue indicates that a dictionary of the (unencrypted) attributes of an item should be returned in the form of a CFDictionaryRef.
-        var returnAttributes: Bool? {
+        public var returnAttributes: Bool? {
             get {
                 return storage[kSecReturnAttributes as String] as? Bool
             }
@@ -490,7 +488,7 @@ final class Keychain {
         /// Match limit attribute key.
         ///
         /// The corresponding value is of type CFNumberRef. If provided, this value specifies the maximum number of results to return or otherwise act upon. For a single item, specify kSecMatchLimitOne. To specify all matching items, specify kSecMatchLimitAll. The default behavior is function-dependent.
-        var matchLimit: MatchLimit? {
+        public var matchLimit: MatchLimit? {
             get {
                 guard let value = storage[kSecMatchLimit as String] else {
                     return nil
@@ -507,7 +505,7 @@ final class Keychain {
             self.storage = storage
         }
         
-        init(_ builder: (inout Attributes) -> Void) {
+        public init(_ builder: (inout Attributes) -> Void) {
             self.init()
             builder(&self)
         }
@@ -516,13 +514,13 @@ final class Keychain {
     
     static let `default` = Keychain(service: Bundle.main.bundleIdentifier ?? String(describing: Keychain.self))
     
-    let service: String
+    public let service: String
     
-    init(service: String) {
+    public init(service: String) {
         self.service = service
     }
     
-    func data(attributes: Attributes) throws -> Data {
+    public func data(attributes: Attributes) throws -> Data {
         var query = attributes
         query.service = service
         query.returnData = true
@@ -540,7 +538,7 @@ final class Keychain {
         throw Error.itemCopyFailed(status: status)
     }
     
-    func setData(_ data: Data, attributes: Attributes, acl: AccessControl, rewriteOnInteractionNotAllowed: Bool = true) throws {
+    public func setData(_ data: Data, attributes: Attributes, acl: AccessControl, rewriteOnInteractionNotAllowed: Bool = true) throws {
         do {
             var query = attributes
             query.useAuthenticationUi = .fail
@@ -587,7 +585,7 @@ final class Keychain {
         }
     }
     
-    func deleteData(attributes: Attributes) throws {
+    public func deleteData(attributes: Attributes) throws {
         var query = attributes
         query.service = service
         
@@ -598,7 +596,7 @@ final class Keychain {
     }
     
     /// Disables authentication UI.
-    func isDataExists(attributes: Attributes) throws -> Bool {
+    public func isDataExists(attributes: Attributes) throws -> Bool {
         var query = attributes
         query.useAuthenticationUi = .fail
         

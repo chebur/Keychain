@@ -7,7 +7,7 @@
 //
 
 import XCTest
-@testable import Keychain
+import Keychain
 
 class KeychainTests: XCTestCase {
 
@@ -55,6 +55,17 @@ class KeychainTests: XCTestCase {
         try XCTContext.runActivity(named: "Delete stored data") { activity in
             try keychain.deleteData(attributes: attributes)
         }
+    }
+    
+    func testDataExists() throws {
+        let keychain = Keychain(service: UUID().uuidString)
+        let attributes = Keychain.Attributes.genericPasswordItem(forAccount: "account", generic: nil)
+        let acl = Keychain.AccessControl(protection: .always)
+        
+        let data = "secret".data(using: .utf8)!
+        try keychain.setData(data, attributes: attributes, acl: acl)
+        let isDataExists = try keychain.isDataExists(attributes: attributes)
+        XCTAssertTrue(isDataExists)
     }
     
 }
